@@ -103,7 +103,7 @@ class Configuration(object):
         given log name up to the given level.
         '''
         log = logging.getLogger(name)
-        log.setLevel(logging.getLevelName(levelname))
+        log.setLevel(logging.getLevelName(level))
         return log
 
     def feature_flag(self, name):
