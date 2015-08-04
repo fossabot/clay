@@ -3,7 +3,6 @@ from __future__ import absolute_import
 import logging.config
 import logging
 import random
-import signal
 import json
 import time
 import os.path
@@ -65,11 +64,21 @@ class Configuration(object):
 
     def init_logging(self):
         '''
-        Configure the default root logger to output WARNING to stderr
+        Configure the default root logger to output WARNING to stderr, unless debug.logging is set
         '''
-        logging.basicConfig(
-            format='%(asctime)s %(name)s %(levelname)s %(message)s',
-            level=logging.WARNING)
+        self.reset_logging()
+        rootlog = logging.getLogger()
+
+        stderr = logging.StreamHandler()
+        fmt = logging.Formatter('%(asctime)s %(levelname)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+        stderr.setFormatter(fmt)
+        rootlog.addHandler(stderr)
+
+        stderr.setLevel(logging.DEBUG)
+        if self.get('debug.logging', False):
+            rootlog.setLevel(logging.DEBUG)
+        else:
+            rootlog.setLevel(logging.WARNING)
 
     def reset_logging(self):
         '''
@@ -88,17 +97,13 @@ class Configuration(object):
         '''
         logging.config.dictConfig(log_config)
 
-    def get_logger(self, name):
+    def get_logger(self, name, level='INFO'):
         '''
         Returns a Logger instance that may be used to emit messages with the
-        given log name, respecting debug behavior.
+        given log name up to the given level.
         '''
-
         log = logging.getLogger(name)
-        if self.get('debug.logging', False):
-            log.setLevel(logging.DEBUG)
-        else:
-            log.setLevel(logging.INFO)
+        log.setLevel(logging.getLevelName(levelname))
         return log
 
     def feature_flag(self, name):
@@ -176,8 +181,10 @@ class FileConfiguration(Configuration):
 CONFIG = FileConfiguration()
 CONFIG.load()
 
-# Upon receiving a SIGHUP, configuration will be reloaded
-signal.signal(signal.SIGHUP, CONFIG.load)
+if os.environ.get('APPENGINE_RUNTIME', None) is None:
+    # Upon receiving a SIGHUP, configuration will be reloaded
+    import signal
+    signal.signal(signal.SIGHUP, CONFIG.load)
 
 # Expose some functions at the top level for convenience
 get = CONFIG.get
